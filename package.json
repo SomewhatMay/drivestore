@@ -1,0 +1,22 @@
+{
+  "name": "drivestore",
+  "description": "Convenient IO to store your client data in their personal cloud storage.",
+  "version": "0.0.1",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "storage",
+    "database"
+  ],
+  "author": "somewhatmay",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "5.7"
+  }
+}
