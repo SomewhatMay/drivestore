@@ -1,3 +1,3 @@
-export function sayHello(name: string) {
-  console.log(`Hello, ${name}`);
+export function sum(numbers: number[]) {
+  return numbers.reduce((total, x) => total + x, 0);
 }
