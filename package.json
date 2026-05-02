@@ -21,6 +21,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "pack:dry": "npm pack --dry-run"
   },
@@ -31,6 +32,8 @@
   "author": "somewhatmay",
   "license": "MIT",
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.5",
+    "dotenv": "^17.4.2",
     "tsup": "^8.5.1",
     "typescript": "5.7",
     "vite": "^8.0.8",
