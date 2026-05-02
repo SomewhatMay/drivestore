@@ -26,3 +26,33 @@ async function driveThrowIfError(
     throw new DriveError(`${context}: HTTP ${res.status}`, res.status, body);
   }
 }
+
+export async function listAll(
+  q: string,
+  accessToken: string
+): Promise<DriveFile[]> {
+  const out: DriveFile[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const url = new URL(`${DRIVE_API}/files`);
+    url.searchParams.set("spaces", "appDataFolder");
+    url.searchParams.set("q", q);
+    // Trim fields to only what we use
+    url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType)");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const res = await driveFetch(url.toString(), accessToken);
+    await driveThrowIfError(res, "Drive list");
+
+    const data = (await res.json()) as {
+      files?: DriveFile[];
+      nextPageToken?: string;
+    };
+
+    out.push(...(data.files ?? []));
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  return out;
+}
