@@ -17,3 +17,15 @@ export interface DriveStoreOptions {
   accessToken: string | (() => Promise<string>);
   rootName?: string;
 }
+
+/** Thrown on any Drive API HTTP error. Carries the status code and raw body. */
+export class DriveError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly body: string = ""
+  ) {
+    super(message);
+    this.name = "DriveError";
+  }
+}
