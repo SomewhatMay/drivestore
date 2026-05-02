@@ -28,17 +28,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Install gcloud CLI
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # Authenticate using service account key (no IAM Credentials API needed)
       - name: Get access token
         id: auth
         run: |
           echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}' > /tmp/sa-key.json
           gcloud auth activate-service-account --key-file=/tmp/sa-key.json
-          echo "access_token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
+          echo "access_token=$(gcloud auth print-access-token --scopes=https://www.googleapis.com/auth/drive.appdata)" >> $GITHUB_OUTPUT
           rm /tmp/sa-key.json
 
       - name: Run tests with coverage
@@ -46,7 +44,6 @@ jobs:
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
 
-      # Upload coverage only once to avoid duplicate uploads from matrix runs
       - name: Upload coverage to Codecov
         if: matrix.node-version == 20
         uses: codecov/codecov-action@v4
