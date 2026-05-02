@@ -56,3 +56,26 @@ export async function listAll(
 
   return out;
 }
+
+export function escapeQueryValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+export async function findChild(
+  parentId: string,
+  name: string,
+  accessToken: string,
+  mimeType?: string
+): Promise<DriveFile | null> {
+  const q = [
+    `'${parentId}' in parents`,
+    `name = '${escapeQueryValue(name)}'`,
+    mimeType ? `mimeType = '${escapeQueryValue(mimeType)}'` : null,
+    `trashed = false`,
+  ]
+    .filter(Boolean)
+    .join(" and ");
+
+  const files = await listAll(q, accessToken);
+  return files[0] ?? null;
+}
