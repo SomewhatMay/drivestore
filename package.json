@@ -1,7 +1,7 @@
 {
   "name": "drivestore",
   "description": "Convenient IO to store your client data in their personal cloud storage.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
