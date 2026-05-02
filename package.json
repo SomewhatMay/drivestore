@@ -18,6 +18,7 @@
   ],
   "scripts": {
     "build": "vitest run && tsup",
+    "build:notest": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
