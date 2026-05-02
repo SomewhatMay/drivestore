@@ -31,22 +31,21 @@ jobs:
 
       # Exchanges your service account key for a short-lived OAuth access token
       # scoped to drive.appdata. The key is stored as a repo/org secret and
-      # never appears in logs. See "Setting up CI" in the README for details.
+      # never appears in logs.
       - name: Authenticate with Google
         id: auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           token_format: access_token
-          scopes: https://www.googleapis.com/auth/drive.appdata
+          access_token_scopes: https://www.googleapis.com/auth/drive.appdata
 
       - name: Run tests with coverage
         run: npm run test:coverage
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
 
-      # Upload the lcov report produced by vitest to Codecov.
-      # Only runs on Node 20 to avoid duplicate uploads from the matrix.
+      # Upload coverage only once to avoid duplicate uploads from matrix runs
       - name: Upload coverage to Codecov
         if: matrix.node-version == 20
         uses: codecov/codecov-action@v4
