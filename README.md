@@ -1,11 +1,9 @@
-# drivestore
+![Banner](banner.png)
 
 > A tiny, typed TypeScript library that turns Google Drive's **appDataFolder** into a simple path-based file store.
 
 [![npm version](https://img.shields.io/npm/v/drivestore.svg?style=flat-square)](https://www.npmjs.com/package/drivestore)
 [![license](https://img.shields.io/github/license/somewhatmay/drivestore?style=flat-square)](./LICENSE)
-[![build](https://img.shields.io/github/actions/workflow/status/somewhatmay/drivestore/ci.yml?style=flat-square)](https://github.com/somewhatmay/drivestore/actions)
-[![coverage](https://img.shields.io/codecov/c/github/somewhatmay/drivestore?style=flat-square&logo=codecov)](https://codecov.io/gh/somewhatmay/drivestore)
 [![types](https://img.shields.io/badge/TypeScript-strict-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 
 ```ts
