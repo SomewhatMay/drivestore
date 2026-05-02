@@ -94,3 +94,32 @@ export async function createFolder(
   const data = (await res.json()) as { id: string };
   return data.id;
 }
+
+export async function readTextById(
+  fileId: string,
+  accessToken: string
+): Promise<string> {
+  const res = await driveFetch(
+    `${DRIVE_API}/files/${fileId}?alt=media`,
+    accessToken
+  );
+  await driveThrowIfError(res, "Drive read");
+  return res.text();
+}
+
+export async function updateTextById(
+  fileId: string,
+  content: string,
+  accessToken: string
+): Promise<void> {
+  const res = await driveFetch(
+    `${UPLOAD_API}/files/${fileId}?uploadType=media&fields=id`,
+    accessToken,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "text/plain" },
+      body: content,
+    }
+  );
+  await driveThrowIfError(res, "Drive update");
+}
