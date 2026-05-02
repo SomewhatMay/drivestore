@@ -123,3 +123,33 @@ export async function updateTextById(
   );
   await driveThrowIfError(res, "Drive update");
 }
+
+export async function createTextFile(
+  parentId: string,
+  name: string,
+  content: string,
+  accessToken: string
+): Promise<string> {
+  const boundary = "drive_multipart_boundary";
+  const body =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify({ name, mimeType: "text/plain", parents: [parentId] }) +
+    `\r\n--${boundary}\r\n` +
+    `Content-Type: text/plain\r\n\r\n` +
+    content +
+    `\r\n--${boundary}--`;
+
+  const res = await driveFetch(
+    `${UPLOAD_API}/files?uploadType=multipart&fields=id`,
+    accessToken,
+    {
+      method: "POST",
+      headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    }
+  );
+  await driveThrowIfError(res, "Drive create");
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
