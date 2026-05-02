@@ -153,3 +153,21 @@ export async function createTextFile(
   const data = (await res.json()) as { id: string };
   return data.id;
 }
+
+export async function deleteById(
+  fileId: string,
+  accessToken: string
+): Promise<void> {
+  const res = await driveFetch(`${DRIVE_API}/files/${fileId}`, accessToken, {
+    method: "DELETE",
+  });
+  // 404 is fine — already gone
+  if (!res.ok && res.status !== 404) {
+    const body = await res.text().catch(() => "");
+    throw new DriveError(
+      `Drive delete failed: HTTP ${res.status}`,
+      res.status,
+      body
+    );
+  }
+}
