@@ -79,3 +79,18 @@ export async function findChild(
   const files = await listAll(q, accessToken);
   return files[0] ?? null;
 }
+
+export async function createFolder(
+  parentId: string,
+  name: string,
+  accessToken: string
+): Promise<string> {
+  const res = await driveFetch(`${DRIVE_API}/files?fields=id`, accessToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+  });
+  await driveThrowIfError(res, "Drive folder create");
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
