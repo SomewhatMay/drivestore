@@ -13,7 +13,6 @@ jobs:
 
     strategy:
       matrix:
-        # Test against the current LTS and the latest stable release
         node-version: [20, 22]
 
     steps:
@@ -29,16 +28,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Exchanges your service account key for a short-lived OAuth access token
-      # scoped to drive.appdata. The key is stored as a repo/org secret and
-      # never appears in logs.
-      - name: Authenticate with Google
+      # Install gcloud CLI
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Authenticate using service account key (no IAM Credentials API needed)
+      - name: Get access token
         id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/drive.appdata
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}' > /tmp/sa-key.json
+          gcloud auth activate-service-account --key-file=/tmp/sa-key.json
+          echo "access_token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
+          rm /tmp/sa-key.json
 
       - name: Run tests with coverage
         run: npm run test:coverage
