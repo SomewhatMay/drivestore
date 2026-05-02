@@ -17,3 +17,12 @@ async function driveFetch(
     },
   });
 }
+async function driveThrowIfError(
+  res: Response,
+  context: string
+): Promise<void> {
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new DriveError(`${context}: HTTP ${res.status}`, res.status, body);
+  }
+}
