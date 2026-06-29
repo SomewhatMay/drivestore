@@ -16,6 +16,19 @@ export interface DriveStore {
 export interface DriveStoreOptions {
   accessToken: string | (() => Promise<string>);
   rootName?: string;
+  /**
+   * Custom `fetch` implementation. Defaults to the global `fetch`. Useful for
+   * Node <18 (supply a polyfill), proxies, or injecting a mock in tests.
+   */
+  fetch?: typeof fetch;
+  /** Abort signal applied to every request the store makes. */
+  signal?: AbortSignal;
+  /** Per-request timeout in milliseconds. Omit or use `0` to disable. */
+  timeoutMs?: number;
+  /** Override the Drive metadata API base URL (advanced / testing). */
+  apiBaseUrl?: string;
+  /** Override the Drive upload API base URL (advanced / testing). */
+  uploadBaseUrl?: string;
 }
 
 /** Thrown on any Drive API HTTP error. Carries the status code and raw body. */

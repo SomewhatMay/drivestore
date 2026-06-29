@@ -1,4 +1,5 @@
 import { createFolder, findChild, FOLDER_MIME } from "./drive-api";
+import { DriveContext } from "./request";
 import { DriveError } from "./types";
 
 export function splitPath(path: string): string[] {
@@ -9,21 +10,16 @@ export function splitPath(path: string): string[] {
 }
 
 export async function resolveRootFolder(
+  ctx: DriveContext,
   rootName: string,
-  accessToken: string,
   cachedRootId: string | null
 ): Promise<string> {
   if (cachedRootId) return cachedRootId;
 
-  const existing = await findChild(
-    "appDataFolder",
-    rootName,
-    accessToken,
-    FOLDER_MIME
-  );
+  const existing = await findChild(ctx, "appDataFolder", rootName, FOLDER_MIME);
   if (existing) return existing.id;
 
-  return createFolder("appDataFolder", rootName, accessToken);
+  return createFolder(ctx, "appDataFolder", rootName);
 }
 
 /**
@@ -31,9 +27,9 @@ export async function resolveRootFolder(
  * Uses `folderCache` to skip redundant Drive API calls on repeated traversals.
  */
 export async function resolveFolderChain(
+  ctx: DriveContext,
   rootId: string,
   segments: string[],
-  accessToken: string,
   createMissing: boolean,
   folderCache: Map<string, string>
 ): Promise<string> {
@@ -48,7 +44,7 @@ export async function resolveFolderChain(
       continue;
     }
 
-    const existing = await findChild(parent, segment, accessToken, FOLDER_MIME);
+    const existing = await findChild(ctx, parent, segment, FOLDER_MIME);
 
     if (existing) {
       folderCache.set(cacheKey, existing.id);
@@ -60,7 +56,7 @@ export async function resolveFolderChain(
       throw new DriveError(`Folder not found: "${segment}"`, 404);
     }
 
-    const newId = await createFolder(parent, segment, accessToken);
+    const newId = await createFolder(ctx, parent, segment);
     folderCache.set(cacheKey, newId);
     parent = newId;
   }

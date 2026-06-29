@@ -10,11 +10,16 @@ import {
   deleteById,
   FOLDER_MIME,
 } from "../src/drive-api";
+import { createContext } from "../src/request";
 import { DriveError } from "../src/types";
 import { getToken } from "./get-token";
 
 function uniqueName(): string {
   return `vitest-api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function ctxFromToken() {
+  return createContext({ accessToken: getToken() });
 }
 
 // Pure unit tests (no network)
@@ -37,75 +42,75 @@ describe("escapeQueryValue", () => {
 
 describe("Drive API — integration", () => {
   it("listAll returns an array (may be empty)", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     const files = await listAll(
-      `name = '${uniqueName()}' and trashed = false`,
-      token
+      ctx,
+      `name = '${uniqueName()}' and trashed = false`
     );
     expect(Array.isArray(files)).toBe(true);
   });
 
   it("findChild returns null for a non-existent name", async () => {
-    const token = getToken();
-    const result = await findChild("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const result = await findChild(ctx, "appDataFolder", uniqueName());
     expect(result).toBeNull();
   });
 
   it("createFolder, findChild, and deleteById round-trip", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     const name = uniqueName();
 
-    const id = await createFolder("appDataFolder", name, token);
+    const id = await createFolder(ctx, "appDataFolder", name);
     expect(typeof id).toBe("string");
     expect(id.length).toBeGreaterThan(0);
 
-    const found = await findChild("appDataFolder", name, token, FOLDER_MIME);
+    const found = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(id);
 
-    await deleteById(id, token);
+    await deleteById(ctx, id);
 
-    const gone = await findChild("appDataFolder", name, token, FOLDER_MIME);
+    const gone = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
     expect(gone).toBeNull();
   });
 
   it("createTextFile, readTextById, updateTextById, deleteById round-trip", async () => {
-    const token = getToken();
-    const folderId = await createFolder("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const folderId = await createFolder(ctx, "appDataFolder", uniqueName());
 
     try {
-      const fileId = await createTextFile(folderId, "data.txt", "hello", token);
+      const fileId = await createTextFile(ctx, folderId, "data.txt", "hello");
       expect(typeof fileId).toBe("string");
 
-      const content = await readTextById(fileId, token);
+      const content = await readTextById(ctx, fileId);
       expect(content).toBe("hello");
 
-      await updateTextById(fileId, "world", token);
-      const updated = await readTextById(fileId, token);
+      await updateTextById(ctx, fileId, "world");
+      const updated = await readTextById(ctx, fileId);
       expect(updated).toBe("world");
 
-      await deleteById(fileId, token);
+      await deleteById(ctx, fileId);
       // Verify the file is truly gone
-      const gone = await findChild(folderId, "data.txt", token, "text/plain");
+      const gone = await findChild(ctx, folderId, "data.txt", "text/plain");
       expect(gone).toBeNull();
     } finally {
       // Clean up the folder regardless of test outcome
-      await deleteById(folderId, token);
+      await deleteById(ctx, folderId);
     }
   });
 
   it("deleteById is idempotent on a missing file (no throw on 404)", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     // A well-formed but non-existent Drive ID; Drive returns 404 which should be swallowed
     await expect(
-      deleteById("nonexistent_file_id_xyz", token)
+      deleteById(ctx, "nonexistent_file_id_xyz")
     ).resolves.toBeUndefined();
   });
 
   it("readTextById throws DriveError on missing file", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     await expect(
-      readTextById("nonexistent_file_id_xyz", token)
+      readTextById(ctx, "nonexistent_file_id_xyz")
     ).rejects.toThrow(DriveError);
   });
 });
