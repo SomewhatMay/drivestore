@@ -19,7 +19,7 @@ const settings = await store.read("config/settings.json");
 
 Google Drive's `appDataFolder` is a hidden, per-app storage space that users can't see or accidentally delete. It's perfect for syncing small amounts of app data — preferences, logs, state — across devices without building your own backend.
 
-`drivestore` wraps the Drive REST API in a dead-simple interface: **read, write, append, exists, delete**. No SDKs, no OAuth scaffolding — just bring an access token.
+`drivestore` wraps the Drive REST API in a dead-simple interface: **read, write, readBytes, writeBytes, append, exists, delete, list**. Text or binary, any state or database layer — no SDKs, no OAuth scaffolding, just bring an access token.
 
 ---
 
@@ -47,6 +47,30 @@ yarn add drivestore
 ```
 
 Requires **Node 18+** (or any runtime with `fetch` built in).
+
+### Browser via `<script>` (no build step)
+
+Use the ES module build straight from a CDN:
+
+```html
+<script type="module">
+  import { createDriveStore } from "https://cdn.jsdelivr.net/npm/drivestore/+esm";
+  const store = createDriveStore({ accessToken });
+</script>
+```
+
+…or the classic global build, which exposes a `DriveStore` global:
+
+```html
+<script src="https://unpkg.com/drivestore"></script>
+<script>
+  const store = DriveStore.createDriveStore({ accessToken });
+  // DriveStore.DriveError is available too
+</script>
+```
+
+`drivestore` runs anywhere there's a `fetch` — a static HTML page with no
+server or backend, a browser app, Node, Deno, or Bun.
 
 ---
 
@@ -302,9 +326,13 @@ echo "GOOGLE_ACCESS_TOKEN=ya29.your-token" > .env.test
 # Run all tests
 npm test
 
-# Run only unit tests (no token needed)
-npm test -- --testPathPattern="functions|path"
+# Run only the unit tests (no token needed) — filter by filename substring
+npm test -- request folder-cache list binary drive-path drive-api
 ```
+
+The unit suites (`request`, `folder-cache`, `list`, `binary`, plus the
+pure-function tests in `drive-path`/`drive-api`) use an injected `fetch` and
+need no network or token. The integration tests require `GOOGLE_ACCESS_TOKEN`.
 
 To get a token quickly during development:
 
@@ -318,19 +346,22 @@ gcloud auth print-access-token
 
 ```
 src/
-├── types.ts        # DriveFile, DriveError, DriveStore interface
-├── drive-api.ts    # Low-level Drive REST wrappers
-├── drive-path.ts   # Path utilities and folder resolution
+├── types.ts        # DriveFile, DriveEntry, DriveError, DriveStore interface
+├── request.ts      # Request context: fetch, auth, timeout/abort, retries
+├── drive-api.ts    # Low-level Drive REST wrappers (text + binary)
+├── drive-path.ts   # Path utilities and folder resolution/cache
 ├── drive-store.ts  # createDriveStore factory
-├── functions.ts    # Utility functions
 └── index.ts        # Public exports
 
 test/
 ├── auth-permission.test.ts
+├── binary.test.ts
 ├── drive-api.test.ts
 ├── drive-path.test.ts
 ├── drive-store.test.ts
-├── functions.test.ts
+├── folder-cache.test.ts
+├── list.test.ts
+├── request.test.ts
 ├── get-token.ts
 └── setup.ts
 ```
