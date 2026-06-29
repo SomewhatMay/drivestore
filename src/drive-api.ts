@@ -61,7 +61,9 @@ async function resumableUpload(
   const uploadRes = await driveFetch(ctx, sessionUri, {
     method: "PUT",
     headers: { "Content-Type": contentType },
-    body,
+    // Cast: a Uint8Array is a valid fetch body, but TS 5.7's stricter
+    // BodyInit (esp. with @types/node) rejects Uint8Array<ArrayBufferLike>.
+    body: body as BodyInit,
   });
   await driveThrowIfError(uploadRes, "Drive resumable upload");
   const data = (await uploadRes.json()) as { id: string };
@@ -194,7 +196,8 @@ async function simpleMediaUpdate(
     {
       method: "PATCH",
       headers: { "Content-Type": contentType },
-      body,
+      // See resumableUpload: Uint8Array is a valid body; cast for TS 5.7.
+      body: body as BodyInit,
     }
   );
   await driveThrowIfError(res, "Drive update");
