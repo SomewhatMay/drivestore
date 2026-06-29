@@ -130,6 +130,40 @@ describe("DriveStore", () => {
     expect(await store.read("shared/b.txt")).toBe("second");
   });
 
+  // Binary
+
+  it("writeBytes / readBytes round-trip arbitrary binary", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    const data = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255]);
+    await store.writeBytes("blobs/data.bin", data);
+    const out = await store.readBytes("blobs/data.bin");
+    expect(Array.from(out)).toEqual(Array.from(data));
+  });
+
+  it("overwrites binary content on a second writeBytes", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.writeBytes("b.bin", new Uint8Array([1, 1, 1]));
+    await store.writeBytes("b.bin", new Uint8Array([9, 8, 7]));
+    expect(Array.from(await store.readBytes("b.bin"))).toEqual([9, 8, 7]);
+  });
+
+  it("exists and delete work on binary files too", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.writeBytes("bin/x.bin", new Uint8Array([42]));
+    expect(await store.exists("bin/x.bin")).toBe(true);
+    await store.delete("bin/x.bin");
+    expect(await store.exists("bin/x.bin")).toBe(false);
+  });
+
   // List
 
   it("lists files and sub-folders in a directory", async () => {

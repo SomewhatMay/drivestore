@@ -26,6 +26,7 @@ Google Drive's `appDataFolder` is a hidden, per-app storage space that users can
 ## Features
 
 - 📁 **Path-based API** — use familiar `folder/subfolder/file.txt` paths
+- 🧱 **Text or binary** — store strings or raw `Uint8Array` bytes; large payloads use resumable upload
 - 🗂️ **Auto folder creation** — nested folders are created on demand
 - ⚡ **Folder ID caching** — repeated writes to the same directory skip redundant API calls
 - 🛡️ **Typed errors** — `DriveError` carries `.status` and `.body` so you can branch on 404 vs 401
@@ -145,6 +146,24 @@ Creates or fully overwrites a file. Intermediate folders are created automatical
 await store.write("config.json", JSON.stringify(config));
 ```
 
+#### `readBytes(path): Promise<Uint8Array>`
+
+Reads a file as raw bytes. Throws `DriveError` with `status: 404` if the file
+does not exist.
+
+```ts
+const bytes = await store.readBytes("cache/image.png");
+```
+
+#### `writeBytes(path, data): Promise<void>`
+
+Creates or fully overwrites a file with raw bytes. Works for any binary payload;
+payloads above ~5 MB are uploaded via Drive's resumable protocol automatically.
+
+```ts
+await store.writeBytes("cache/image.png", new Uint8Array(buffer));
+```
+
 #### `append(path, content): Promise<void>`
 
 Appends `content` to an existing file, or creates it if absent. Intermediate folders are created automatically.
@@ -212,6 +231,36 @@ try {
 | `message` | `string` | Human-readable description including the HTTP status |
 | `status`  | `number` | HTTP status code (`404`, `401`, `403`, …)            |
 | `body`    | `string` | Raw response body from the Drive API                 |
+
+---
+
+## Storing binary data & databases
+
+`drivestore` is storage-agnostic — it just persists bytes at a path. How you
+produce those bytes is entirely up to you. The text (`read`/`write`) and binary
+(`readBytes`/`writeBytes`) APIs are peers; pick whichever fits your data.
+
+A few equally-valid patterns:
+
+```ts
+// Direct state — persist whatever you already have
+await store.write("settings.json", JSON.stringify(settings));
+
+// A Redux / Zustand / Jotai snapshot — serialize your store however you like
+await store.write("state.json", JSON.stringify(serializeStore()));
+
+// Raw binary — images, msgpack, compressed blobs, protobufs, …
+await store.writeBytes("assets/logo.png", new Uint8Array(buffer));
+
+// A sql.js database — export to bytes and round-trip them as-is
+await store.writeBytes("db/app.sqlite", db.export());
+const SQL = await initSqlJs();
+const restored = new SQL.Database(await store.readBytes("db/app.sqlite"));
+```
+
+The binary API stores bytes verbatim (no base64 inflation), so it suits large
+or non-text payloads. sql.js is just one option among many — bring any state or
+database layer you prefer.
 
 ---
 
