@@ -5,7 +5,12 @@ import {
   readTextById,
   updateTextById,
 } from "./drive-api";
-import { resolveFolderChain, resolveRootFolder, splitPath } from "./drive-path";
+import {
+  createFolderCache,
+  resolveFolderChain,
+  resolveRootFolder,
+  splitPath,
+} from "./drive-path";
 import { createContext } from "./request";
 import { DriveError, DriveFile, DriveStore, DriveStoreOptions } from "./types";
 
@@ -14,8 +19,8 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
   const rootName = options.rootName ?? "drive-store";
 
   let cachedRootId: string | null = null;
-  // Caches resolved "parentId/folderName" → folderId to avoid redundant traversals
-  const folderCache = new Map<string, string>();
+  // Caches resolved folder IDs (and dedupes concurrent folder creation)
+  const folderCache = createFolderCache();
 
   async function getRootId(): Promise<string> {
     cachedRootId = await resolveRootFolder(ctx, rootName, cachedRootId);
@@ -74,7 +79,9 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
         return;
       }
 
-      // NOTE: read-then-write is not atomic; concurrent appends may lose data.
+      // NOTE: read-then-write is not atomic. Retries/refresh do not make this
+      // safe — concurrent appends (e.g. multiple tabs or processes sharing the
+      // same account) may interleave or lose data. Serialize at the app level.
       const current = await readTextById(ctx, file.id);
       await updateTextById(ctx, file.id, current + newContent);
     },

@@ -30,7 +30,8 @@ Google Drive's `appDataFolder` is a hidden, per-app storage space that users can
 - ⚡ **Folder ID caching** — repeated writes to the same directory skip redundant API calls
 - 🛡️ **Typed errors** — `DriveError` carries `.status` and `.body` so you can branch on 404 vs 401
 - 🔑 **Flexible auth** — pass a static token string or an async function that refreshes it
-- 🪶 **Zero dependencies** — uses the native `fetch` API
+- 🔁 **Resilient by default** — automatic backoff retries on rate-limit/5xx, one-shot token refresh on `401`
+- 🪶 **Zero dependencies** — uses the native `fetch` API (bring your own for Node <18)
 
 ---
 
@@ -110,10 +111,17 @@ await store.delete("users/alice/prefs.json");
 
 Returns a `DriveStore` instance.
 
-| Option        | Type                              | Default         | Description                                                                       |
-| ------------- | --------------------------------- | --------------- | --------------------------------------------------------------------------------- |
-| `accessToken` | `string \| () => Promise<string>` | —               | **Required.** OAuth token or async supplier.                                      |
-| `rootName`    | `string`                          | `"drive-store"` | Name of the root folder in `appDataFolder`. Useful for namespacing multiple apps. |
+| Option             | Type                              | Default         | Description                                                                        |
+| ------------------ | --------------------------------- | --------------- | --------------------------------------------------------------------------------- |
+| `accessToken`      | `string \| () => Promise<string>` | —               | **Required.** OAuth token or async supplier.                                      |
+| `rootName`         | `string`                          | `"drive-store"` | Name of the root folder in `appDataFolder`. Useful for namespacing multiple apps. |
+| `fetch`            | `typeof fetch`                    | global `fetch`  | Custom `fetch` (Node <18 polyfill, proxies, or test mocking).                     |
+| `signal`           | `AbortSignal`                     | —               | Abort signal applied to every request.                                            |
+| `timeoutMs`        | `number`                          | —               | Per-request timeout in milliseconds.                                              |
+| `maxRetries`       | `number`                          | `3`             | Retry attempts for transient failures (`429`/`502`/`503`/`504`). `0` disables.    |
+| `retryBaseDelayMs` | `number`                          | `300`           | Base delay for exponential backoff between retries.                               |
+| `apiBaseUrl`       | `string`                          | Google Drive v3 | Override the Drive metadata API base URL (advanced / testing).                    |
+| `uploadBaseUrl`    | `string`                          | Google upload   | Override the Drive upload API base URL (advanced / testing).                       |
 
 ---
 
