@@ -130,6 +130,42 @@ describe("DriveStore", () => {
     expect(await store.read("shared/b.txt")).toBe("second");
   });
 
+  // List
+
+  it("lists files and sub-folders in a directory", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.write("dir/a.txt", "1");
+    await store.write("dir/b.txt", "2");
+    await store.write("dir/sub/c.txt", "3");
+
+    const entries = await store.list("dir");
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e.type]));
+    expect(byName["a.txt"]).toBe("file");
+    expect(byName["b.txt"]).toBe("file");
+    expect(byName["sub"]).toBe("directory");
+  });
+
+  it("lists the store root for an empty path", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.write("root-level.txt", "hi");
+    const entries = await store.list("");
+    expect(entries.some((e) => e.name === "root-level.txt")).toBe(true);
+  });
+
+  it("throws DriveError (404) when listing a missing directory", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await expect(store.list("nope/missing")).rejects.toThrow(DriveError);
+  });
+
   // Token function
 
   it("accepts an async token function", async () => {

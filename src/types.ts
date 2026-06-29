@@ -4,6 +4,14 @@ export type DriveFile = {
   mimeType: string;
 };
 
+export type DriveEntryType = "file" | "directory";
+
+/** A single child returned by {@link DriveStore.list}. */
+export interface DriveEntry {
+  name: string;
+  type: DriveEntryType;
+}
+
 export interface DriveStore {
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
@@ -15,6 +23,12 @@ export interface DriveStore {
   append(path: string, newContent: string): Promise<void>;
   exists(path: string): Promise<boolean>;
   delete(path: string): Promise<void>;
+  /**
+   * Lists the entries (files and sub-folders) directly under a directory.
+   * Pass an empty path to list the store root. Throws `DriveError` with
+   * `status: 404` if the directory does not exist.
+   */
+  list(path: string): Promise<DriveEntry[]>;
 }
 
 export interface DriveStoreOptions {
