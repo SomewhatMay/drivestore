@@ -6,7 +6,7 @@ export const TEXT_MIME = "text/plain";
 export const BINARY_MIME = "application/octet-stream";
 
 /**
- * Payloads at or above this size are sent via Drive's resumable upload
+ * Payloads larger than this size are sent via Drive's resumable upload
  * protocol instead of a single simple/multipart upload, which Google caps
  * around 5 MB. Keeps large blobs (e.g. a serialized database) from failing.
  */
