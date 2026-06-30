@@ -326,13 +326,15 @@ echo "GOOGLE_ACCESS_TOKEN=ya29.your-token" > .env.test
 # Run all tests
 npm test
 
-# Run only the unit tests (no token needed) — filter by filename substring
-npm test -- request folder-cache list binary drive-path drive-api
+# Run only the network-free unit suites (no token needed)
+npm test -- request folder-cache list binary public-api
 ```
 
-The unit suites (`request`, `folder-cache`, `list`, `binary`, plus the
-pure-function tests in `drive-path`/`drive-api`) use an injected `fetch` and
-need no network or token. The integration tests require `GOOGLE_ACCESS_TOKEN`.
+The suites above (`request`, `folder-cache`, `list`, `binary`, `public-api`)
+use an injected `fetch`, so they need no network or token. The `drive-api` and
+`drive-path` files also contain pure-function unit tests, but those same files
+include integration tests that require `GOOGLE_ACCESS_TOKEN` — so running them
+needs a token.
 
 To get a token quickly during development:
 
