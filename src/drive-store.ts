@@ -19,12 +19,28 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
   const rootName = options.rootName ?? "drive-store";
 
   let cachedRootId: string | null = null;
+  // Dedupes the in-flight root resolution so concurrent first operations don't
+  // each create a duplicate root folder (the same race the folderCache fixes
+  // for sub-folders).
+  let rootIdPromise: Promise<string> | null = null;
   // Caches resolved folder IDs (and dedupes concurrent folder creation)
   const folderCache = createFolderCache();
 
   async function getRootId(): Promise<string> {
-    cachedRootId = await resolveRootFolder(ctx, rootName, cachedRootId);
-    return cachedRootId;
+    if (cachedRootId) return cachedRootId;
+    if (!rootIdPromise) {
+      rootIdPromise = resolveRootFolder(ctx, rootName, cachedRootId)
+        .then((id) => {
+          cachedRootId = id;
+          rootIdPromise = null;
+          return id;
+        })
+        .catch((err) => {
+          rootIdPromise = null;
+          throw err;
+        });
+    }
+    return rootIdPromise;
   }
 
   /**
