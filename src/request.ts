@@ -79,17 +79,24 @@ function prepareSignal(ctx: DriveContext): PreparedSignal {
 
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let removeAbortListener: () => void = () => {};
 
   const abort = (reason: unknown) => {
     if (!controller.signal.aborted) controller.abort(reason);
   };
 
   if (ctx.signal) {
-    if (ctx.signal.aborted) abort(ctx.signal.reason);
-    else
-      ctx.signal.addEventListener("abort", () => abort(ctx.signal!.reason), {
-        once: true,
-      });
+    if (ctx.signal.aborted) {
+      abort(ctx.signal.reason);
+    } else {
+      // Capture the listener so it can be detached on cleanup — otherwise a
+      // long-lived caller signal accumulates one dead listener per request.
+      const external = ctx.signal;
+      const onAbort = () => abort(external.reason);
+      external.addEventListener("abort", onAbort, { once: true });
+      removeAbortListener = () =>
+        external.removeEventListener("abort", onAbort);
+    }
   }
 
   if (hasTimeout) {
@@ -103,6 +110,7 @@ function prepareSignal(ctx: DriveContext): PreparedSignal {
     signal: controller.signal,
     cleanup: () => {
       if (timer) clearTimeout(timer);
+      removeAbortListener();
     },
   };
 }

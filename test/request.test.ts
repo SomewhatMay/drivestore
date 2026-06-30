@@ -118,6 +118,25 @@ describe("driveFetch", () => {
     expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("detaches its abort listener after a request settles (no leak)", async () => {
+    const fetchImpl = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(okResponse())
+    );
+    const controller = new AbortController();
+    const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+
+    const ctx = createContext({
+      accessToken: "t",
+      signal: controller.signal,
+      fetch: fetchImpl as never,
+    });
+
+    await driveFetch(ctx, "https://example.test/x");
+
+    // Listener added for this request must be removed once it completes.
+    expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
   it("aborts the request when the caller's signal is already aborted", async () => {
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.signal?.aborted) {
