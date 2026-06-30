@@ -1,11 +1,32 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { createDriveStore } from "../src/drive-store";
+import { createContext } from "../src/request";
+import { deleteById, findChild, FOLDER_MIME } from "../src/drive-api";
 import { DriveError } from "../src/types";
 import { getToken } from "./get-token";
 
+// Every store created below provisions a real root folder under appDataFolder.
+// Track each one and delete it after the test so runs leave no residue.
+let createdRoots: string[] = [];
+
 function uniqueRoot(): string {
-  return `vitest-store-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const name = `vitest-store-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  createdRoots.push(name);
+  return name;
 }
+
+afterEach(async () => {
+  // Nothing tracked → unit-only/no-token run; never touch the token.
+  if (createdRoots.length === 0) return;
+  const roots = createdRoots;
+  createdRoots = [];
+  const ctx = createContext({ accessToken: getToken() });
+  for (const name of roots) {
+    // Deleting a Drive folder removes its contents; deleteById ignores 404.
+    const root = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
+    if (root) await deleteById(ctx, root.id);
+  }
+});
 
 describe("DriveStore", () => {
   // Core read / write

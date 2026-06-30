@@ -61,17 +61,22 @@ describe("Drive API — integration", () => {
     const name = uniqueName();
 
     const id = await createFolder(ctx, "appDataFolder", name);
-    expect(typeof id).toBe("string");
-    expect(id.length).toBeGreaterThan(0);
+    try {
+      expect(typeof id).toBe("string");
+      expect(id.length).toBeGreaterThan(0);
 
-    const found = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(id);
+      const found = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(id);
 
-    await deleteById(ctx, id);
+      await deleteById(ctx, id);
 
-    const gone = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
-    expect(gone).toBeNull();
+      const gone = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
+      expect(gone).toBeNull();
+    } finally {
+      // Safety net if an assertion above threw before the explicit delete.
+      await deleteById(ctx, id);
+    }
   });
 
   it("createTextFile, readTextById, updateTextById, deleteById round-trip", async () => {
