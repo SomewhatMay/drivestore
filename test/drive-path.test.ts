@@ -56,11 +56,12 @@ describe("resolveRootFolder — integration", () => {
     const rootName = uniqueName();
 
     const id = await resolveRootFolder(ctx, rootName, null);
-    expect(typeof id).toBe("string");
-    expect(id.length).toBeGreaterThan(0);
-
-    // Clean up
-    await deleteById(ctx, id);
+    try {
+      expect(typeof id).toBe("string");
+      expect(id.length).toBeGreaterThan(0);
+    } finally {
+      await deleteById(ctx, id);
+    }
   });
 
   it("returns the same ID on a second call (skips network via cache)", async () => {
@@ -68,11 +69,13 @@ describe("resolveRootFolder — integration", () => {
     const rootName = uniqueName();
 
     const id1 = await resolveRootFolder(ctx, rootName, null);
-    // Pass the cached ID; should skip Drive and return immediately
-    const id2 = await resolveRootFolder(ctx, rootName, id1);
-    expect(id2).toBe(id1);
-
-    await deleteById(ctx, id1);
+    try {
+      // Pass the cached ID; should skip Drive and return immediately
+      const id2 = await resolveRootFolder(ctx, rootName, id1);
+      expect(id2).toBe(id1);
+    } finally {
+      await deleteById(ctx, id1);
+    }
   });
 
   it("re-uses an existing root folder rather than creating a duplicate", async () => {
@@ -80,10 +83,12 @@ describe("resolveRootFolder — integration", () => {
     const rootName = uniqueName();
 
     const id1 = await resolveRootFolder(ctx, rootName, null);
-    const id2 = await resolveRootFolder(ctx, rootName, null);
-    expect(id2).toBe(id1);
-
-    await deleteById(ctx, id1);
+    try {
+      const id2 = await resolveRootFolder(ctx, rootName, null);
+      expect(id2).toBe(id1);
+    } finally {
+      await deleteById(ctx, id1);
+    }
   });
 });
 
