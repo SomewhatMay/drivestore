@@ -171,6 +171,22 @@ Deletes the file. Throws `DriveError` with `status: 404` if the file does not ex
 await store.delete("cache/result.json");
 ```
 
+#### `list(path): Promise<DriveEntry[]>`
+
+Lists the entries directly under a directory. Pass an empty path to list the
+store root. Each entry is `{ name, type }` where `type` is `"file"` or
+`"directory"`. Throws `DriveError` with `status: 404` if the directory does not
+exist.
+
+```ts
+const entries = await store.list("logs");
+// [{ name: "2025-01.txt", type: "file" }, { name: "archive", type: "directory" }]
+
+for (const entry of entries) {
+  if (entry.type === "file") console.log(entry.name);
+}
+```
+
 ---
 
 ### `DriveError`

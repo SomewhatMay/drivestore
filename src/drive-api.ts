@@ -37,6 +37,13 @@ export function escapeQueryValue(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
+export async function listChildren(
+  ctx: DriveContext,
+  parentId: string
+): Promise<DriveFile[]> {
+  return listAll(ctx, `'${parentId}' in parents and trashed = false`);
+}
+
 export async function findChild(
   ctx: DriveContext,
   parentId: string,

@@ -2,6 +2,8 @@ import {
   createTextFile,
   deleteById,
   findChild,
+  FOLDER_MIME,
+  listChildren,
   readTextById,
   updateTextById,
 } from "./drive-api";
@@ -12,7 +14,13 @@ import {
   splitPath,
 } from "./drive-path";
 import { createContext } from "./request";
-import { DriveError, DriveFile, DriveStore, DriveStoreOptions } from "./types";
+import {
+  DriveEntry,
+  DriveError,
+  DriveFile,
+  DriveStore,
+  DriveStoreOptions,
+} from "./types";
 
 export function createDriveStore(options: DriveStoreOptions): DriveStore {
   const ctx = createContext(options);
@@ -121,6 +129,24 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
       const { file } = await resolveFilePath(parts, false);
       if (!file) throw new DriveError(`File not found: "${path}"`, 404);
       await deleteById(ctx, file.id);
+    },
+
+    async list(path: string): Promise<DriveEntry[]> {
+      // An empty path lists the store root; otherwise every segment is a folder.
+      const parts = splitPath(path);
+      const rootId = await getRootId();
+      const folderId = await resolveFolderChain(
+        ctx,
+        rootId,
+        parts,
+        false,
+        folderCache
+      );
+      const children = await listChildren(ctx, folderId);
+      return children.map((child) => ({
+        name: child.name,
+        type: child.mimeType === FOLDER_MIME ? "directory" : "file",
+      }));
     },
   };
 }
