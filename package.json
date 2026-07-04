@@ -30,6 +30,9 @@
     "storage",
     "database"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "author": "somewhatmay",
   "license": "MIT",
   "devDependencies": {

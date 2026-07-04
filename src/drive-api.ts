@@ -1,48 +1,24 @@
 import { DriveError, DriveFile } from "./types";
+import { DriveContext, driveFetch, driveThrowIfError } from "./request";
 
-const DRIVE_API = "https://www.googleapis.com/drive/v3";
-const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
 export const FOLDER_MIME = "application/vnd.google-apps.folder";
 
-async function driveFetch(
-  url: string,
-  accessToken: string,
-  init?: RequestInit
-): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(init?.headers ?? {}),
-    },
-  });
-}
-async function driveThrowIfError(
-  res: Response,
-  context: string
-): Promise<void> {
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new DriveError(`${context}: HTTP ${res.status}`, res.status, body);
-  }
-}
-
 export async function listAll(
-  q: string,
-  accessToken: string
+  ctx: DriveContext,
+  q: string
 ): Promise<DriveFile[]> {
   const out: DriveFile[] = [];
   let pageToken: string | undefined;
 
   do {
-    const url = new URL(`${DRIVE_API}/files`);
+    const url = new URL(`${ctx.apiBase}/files`);
     url.searchParams.set("spaces", "appDataFolder");
     url.searchParams.set("q", q);
     // Trim fields to only what we use
     url.searchParams.set("fields", "nextPageToken,files(id,name,mimeType)");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
-    const res = await driveFetch(url.toString(), accessToken);
+    const res = await driveFetch(ctx, url.toString());
     await driveThrowIfError(res, "Drive list");
 
     const data = (await res.json()) as {
@@ -62,9 +38,9 @@ export function escapeQueryValue(value: string): string {
 }
 
 export async function findChild(
+  ctx: DriveContext,
   parentId: string,
   name: string,
-  accessToken: string,
   mimeType?: string
 ): Promise<DriveFile | null> {
   const q = [
@@ -76,16 +52,16 @@ export async function findChild(
     .filter(Boolean)
     .join(" and ");
 
-  const files = await listAll(q, accessToken);
+  const files = await listAll(ctx, q);
   return files[0] ?? null;
 }
 
 export async function createFolder(
+  ctx: DriveContext,
   parentId: string,
-  name: string,
-  accessToken: string
+  name: string
 ): Promise<string> {
-  const res = await driveFetch(`${DRIVE_API}/files?fields=id`, accessToken, {
+  const res = await driveFetch(ctx, `${ctx.apiBase}/files?fields=id`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
@@ -96,25 +72,22 @@ export async function createFolder(
 }
 
 export async function readTextById(
-  fileId: string,
-  accessToken: string
+  ctx: DriveContext,
+  fileId: string
 ): Promise<string> {
-  const res = await driveFetch(
-    `${DRIVE_API}/files/${fileId}?alt=media`,
-    accessToken
-  );
+  const res = await driveFetch(ctx, `${ctx.apiBase}/files/${fileId}?alt=media`);
   await driveThrowIfError(res, "Drive read");
   return res.text();
 }
 
 export async function updateTextById(
+  ctx: DriveContext,
   fileId: string,
-  content: string,
-  accessToken: string
+  content: string
 ): Promise<void> {
   const res = await driveFetch(
-    `${UPLOAD_API}/files/${fileId}?uploadType=media&fields=id`,
-    accessToken,
+    ctx,
+    `${ctx.uploadBase}/files/${fileId}?uploadType=media&fields=id`,
     {
       method: "PATCH",
       headers: { "Content-Type": "text/plain" },
@@ -125,10 +98,10 @@ export async function updateTextById(
 }
 
 export async function createTextFile(
+  ctx: DriveContext,
   parentId: string,
   name: string,
-  content: string,
-  accessToken: string
+  content: string
 ): Promise<string> {
   const boundary = "drive_multipart_boundary";
   const body =
@@ -141,8 +114,8 @@ export async function createTextFile(
     `\r\n--${boundary}--`;
 
   const res = await driveFetch(
-    `${UPLOAD_API}/files?uploadType=multipart&fields=id`,
-    accessToken,
+    ctx,
+    `${ctx.uploadBase}/files?uploadType=multipart&fields=id`,
     {
       method: "POST",
       headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
@@ -155,10 +128,10 @@ export async function createTextFile(
 }
 
 export async function deleteById(
-  fileId: string,
-  accessToken: string
+  ctx: DriveContext,
+  fileId: string
 ): Promise<void> {
-  const res = await driveFetch(`${DRIVE_API}/files/${fileId}`, accessToken, {
+  const res = await driveFetch(ctx, `${ctx.apiBase}/files/${fileId}`, {
     method: "DELETE",
   });
   // 404 is fine — already gone

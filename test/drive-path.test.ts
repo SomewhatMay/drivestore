@@ -10,11 +10,16 @@ import {
   findChild,
   FOLDER_MIME,
 } from "../src/drive-api";
+import { createContext } from "../src/request";
 import { DriveError } from "../src/types";
 import { getToken } from "./get-token";
 
 function uniqueName(): string {
   return `vitest-path-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function ctxFromToken() {
+  return createContext({ accessToken: getToken() });
 }
 
 // Pure unit tests (no network)
@@ -46,112 +51,112 @@ describe("splitPath", () => {
 
 describe("resolveRootFolder — integration", () => {
   it("creates the root folder when it does not exist", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     const rootName = uniqueName();
 
-    const id = await resolveRootFolder(rootName, token, null);
+    const id = await resolveRootFolder(ctx, rootName, null);
     expect(typeof id).toBe("string");
     expect(id.length).toBeGreaterThan(0);
 
     // Clean up
-    await deleteById(id, token);
+    await deleteById(ctx, id);
   });
 
   it("returns the same ID on a second call (skips network via cache)", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     const rootName = uniqueName();
 
-    const id1 = await resolveRootFolder(rootName, token, null);
+    const id1 = await resolveRootFolder(ctx, rootName, null);
     // Pass the cached ID; should skip Drive and return immediately
-    const id2 = await resolveRootFolder(rootName, token, id1);
+    const id2 = await resolveRootFolder(ctx, rootName, id1);
     expect(id2).toBe(id1);
 
-    await deleteById(id1, token);
+    await deleteById(ctx, id1);
   });
 
   it("re-uses an existing root folder rather than creating a duplicate", async () => {
-    const token = getToken();
+    const ctx = ctxFromToken();
     const rootName = uniqueName();
 
-    const id1 = await resolveRootFolder(rootName, token, null);
-    const id2 = await resolveRootFolder(rootName, token, null);
+    const id1 = await resolveRootFolder(ctx, rootName, null);
+    const id2 = await resolveRootFolder(ctx, rootName, null);
     expect(id2).toBe(id1);
 
-    await deleteById(id1, token);
+    await deleteById(ctx, id1);
   });
 });
 
 describe("resolveFolderChain — integration", () => {
   it("returns rootId immediately for an empty segment list", async () => {
-    const token = getToken();
-    const rootId = await createFolder("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
     const cache = new Map<string, string>();
 
     try {
-      const result = await resolveFolderChain(rootId, [], token, false, cache);
+      const result = await resolveFolderChain(ctx, rootId, [], false, cache);
       expect(result).toBe(rootId);
     } finally {
-      await deleteById(rootId, token);
+      await deleteById(ctx, rootId);
     }
   });
 
   it("creates nested folders when createMissing is true", async () => {
-    const token = getToken();
-    const rootId = await createFolder("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
     const cache = new Map<string, string>();
     const seg1 = uniqueName();
     const seg2 = uniqueName();
 
     try {
       const leafId = await resolveFolderChain(
+        ctx,
         rootId,
         [seg1, seg2],
-        token,
         true,
         cache
       );
       expect(typeof leafId).toBe("string");
 
       // Verify hierarchy exists
-      const child1 = await findChild(rootId, seg1, token, FOLDER_MIME);
+      const child1 = await findChild(ctx, rootId, seg1, FOLDER_MIME);
       expect(child1).not.toBeNull();
-      const child2 = await findChild(child1!.id, seg2, token, FOLDER_MIME);
+      const child2 = await findChild(ctx, child1!.id, seg2, FOLDER_MIME);
       expect(child2).not.toBeNull();
       expect(child2!.id).toBe(leafId);
     } finally {
-      await deleteById(rootId, token);
+      await deleteById(ctx, rootId);
     }
   });
 
   it("throws DriveError (404) when folder is missing and createMissing is false", async () => {
-    const token = getToken();
-    const rootId = await createFolder("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
     const cache = new Map<string, string>();
 
     try {
       await expect(
-        resolveFolderChain(rootId, ["does-not-exist"], token, false, cache)
+        resolveFolderChain(ctx, rootId, ["does-not-exist"], false, cache)
       ).rejects.toThrow(DriveError);
     } finally {
-      await deleteById(rootId, token);
+      await deleteById(ctx, rootId);
     }
   });
 
   it("populates the folder cache and avoids re-traversal", async () => {
-    const token = getToken();
-    const rootId = await createFolder("appDataFolder", uniqueName(), token);
+    const ctx = ctxFromToken();
+    const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
     const cache = new Map<string, string>();
     const seg = uniqueName();
 
     try {
-      const id1 = await resolveFolderChain(rootId, [seg], token, true, cache);
+      const id1 = await resolveFolderChain(ctx, rootId, [seg], true, cache);
       expect(cache.size).toBe(1);
 
       // Second call — should use cache (still returns same ID)
-      const id2 = await resolveFolderChain(rootId, [seg], token, false, cache);
+      const id2 = await resolveFolderChain(ctx, rootId, [seg], false, cache);
       expect(id2).toBe(id1);
     } finally {
-      await deleteById(rootId, token);
+      await deleteById(ctx, rootId);
     }
   });
 });
