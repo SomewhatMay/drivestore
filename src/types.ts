@@ -4,18 +4,64 @@ export type DriveFile = {
   mimeType: string;
 };
 
+export type DriveEntryType = "file" | "directory";
+
+/** A single child returned by {@link DriveStore.list}. */
+export interface DriveEntry {
+  name: string;
+  type: DriveEntryType;
+}
+
 export interface DriveStore {
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
-  /** Creates the file if it does not exist; appends otherwise. NOT atomic under concurrent access. */
+  /** Reads a file as raw bytes. Throws `DriveError` 404 if it does not exist. */
+  readBytes(path: string): Promise<Uint8Array>;
+  /**
+   * Writes raw bytes, creating or fully overwriting the file. Suitable for any
+   * binary payload — images, msgpack, compressed state, a serialized database,
+   * etc. Large payloads are uploaded via Drive's resumable protocol.
+   */
+  writeBytes(path: string, data: Uint8Array): Promise<void>;
+  /**
+   * Creates the file if it does not exist; appends otherwise. NOT atomic:
+   * concurrent appends across tabs/processes may interleave or lose data.
+   * Serialize access at the application level if that matters.
+   */
   append(path: string, newContent: string): Promise<void>;
   exists(path: string): Promise<boolean>;
   delete(path: string): Promise<void>;
+  /**
+   * Lists the entries (files and sub-folders) directly under a directory.
+   * Pass an empty path to list the store root. Throws `DriveError` with
+   * `status: 404` if the directory does not exist.
+   */
+  list(path: string): Promise<DriveEntry[]>;
 }
 
 export interface DriveStoreOptions {
   accessToken: string | (() => Promise<string>);
   rootName?: string;
+  /**
+   * Custom `fetch` implementation. Defaults to the global `fetch`. Useful for
+   * Node <18 (supply a polyfill), proxies, or injecting a mock in tests.
+   */
+  fetch?: typeof fetch;
+  /** Abort signal applied to every request the store makes. */
+  signal?: AbortSignal;
+  /** Per-request timeout in milliseconds. Omit or use `0` to disable. */
+  timeoutMs?: number;
+  /** Override the Drive metadata API base URL (advanced / testing). */
+  apiBaseUrl?: string;
+  /** Override the Drive upload API base URL (advanced / testing). */
+  uploadBaseUrl?: string;
+  /**
+   * Max retry attempts for transient failures (429/502/503/504), after the
+   * first try. Defaults to `3`. Set to `0` to disable retries.
+   */
+  maxRetries?: number;
+  /** Base delay (ms) for exponential backoff between retries. Defaults to `300`. */
+  retryBaseDelayMs?: number;
 }
 
 /** Thrown on any Drive API HTTP error. Carries the status code and raw body. */

@@ -1,11 +1,32 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { createDriveStore } from "../src/drive-store";
+import { createContext } from "../src/request";
+import { deleteById, findChild, FOLDER_MIME } from "../src/drive-api";
 import { DriveError } from "../src/types";
 import { getToken } from "./get-token";
 
+// Every store created below provisions a real root folder under appDataFolder.
+// Track each one and delete it after the test so runs leave no residue.
+let createdRoots: string[] = [];
+
 function uniqueRoot(): string {
-  return `vitest-store-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const name = `vitest-store-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  createdRoots.push(name);
+  return name;
 }
+
+afterEach(async () => {
+  // Nothing tracked → unit-only/no-token run; never touch the token.
+  if (createdRoots.length === 0) return;
+  const roots = createdRoots;
+  createdRoots = [];
+  const ctx = createContext({ accessToken: getToken() });
+  for (const name of roots) {
+    // Deleting a Drive folder removes its contents; deleteById ignores 404.
+    const root = await findChild(ctx, "appDataFolder", name, FOLDER_MIME);
+    if (root) await deleteById(ctx, root.id);
+  }
+});
 
 describe("DriveStore", () => {
   // Core read / write
@@ -128,6 +149,76 @@ describe("DriveStore", () => {
     await store.write("shared/b.txt", "second"); // should hit folder cache
     expect(await store.read("shared/a.txt")).toBe("first");
     expect(await store.read("shared/b.txt")).toBe("second");
+  });
+
+  // Binary
+
+  it("writeBytes / readBytes round-trip arbitrary binary", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    const data = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255]);
+    await store.writeBytes("blobs/data.bin", data);
+    const out = await store.readBytes("blobs/data.bin");
+    expect(Array.from(out)).toEqual(Array.from(data));
+  });
+
+  it("overwrites binary content on a second writeBytes", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.writeBytes("b.bin", new Uint8Array([1, 1, 1]));
+    await store.writeBytes("b.bin", new Uint8Array([9, 8, 7]));
+    expect(Array.from(await store.readBytes("b.bin"))).toEqual([9, 8, 7]);
+  });
+
+  it("exists and delete work on binary files too", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.writeBytes("bin/x.bin", new Uint8Array([42]));
+    expect(await store.exists("bin/x.bin")).toBe(true);
+    await store.delete("bin/x.bin");
+    expect(await store.exists("bin/x.bin")).toBe(false);
+  });
+
+  // List
+
+  it("lists files and sub-folders in a directory", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.write("dir/a.txt", "1");
+    await store.write("dir/b.txt", "2");
+    await store.write("dir/sub/c.txt", "3");
+
+    const entries = await store.list("dir");
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e.type]));
+    expect(byName["a.txt"]).toBe("file");
+    expect(byName["b.txt"]).toBe("file");
+    expect(byName["sub"]).toBe("directory");
+  });
+
+  it("lists the store root for an empty path", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await store.write("root-level.txt", "hi");
+    const entries = await store.list("");
+    expect(entries.some((e) => e.name === "root-level.txt")).toBe(true);
+  });
+
+  it("throws DriveError (404) when listing a missing directory", async () => {
+    const store = createDriveStore({
+      accessToken: getToken(),
+      rootName: uniqueRoot(),
+    });
+    await expect(store.list("nope/missing")).rejects.toThrow(DriveError);
   });
 
   // Token function

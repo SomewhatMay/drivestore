@@ -1,10 +1,13 @@
 {
   "name": "drivestore",
-  "description": "Convenient IO to store your client data in their personal cloud storage.",
+  "description": "A tiny, typed path-based file store backed by Google Drive's appDataFolder — store text or binary, bring any state or database layer.",
   "version": "0.1.0",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "unpkg": "./dist/index.global.js",
+  "jsdelivr": "./dist/index.global.js",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -30,6 +33,9 @@
     "storage",
     "database"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "author": "somewhatmay",
   "license": "MIT",
   "devDependencies": {

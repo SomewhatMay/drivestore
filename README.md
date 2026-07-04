@@ -19,18 +19,20 @@ const settings = await store.read("config/settings.json");
 
 Google Drive's `appDataFolder` is a hidden, per-app storage space that users can't see or accidentally delete. It's perfect for syncing small amounts of app data — preferences, logs, state — across devices without building your own backend.
 
-`drivestore` wraps the Drive REST API in a dead-simple interface: **read, write, append, exists, delete**. No SDKs, no OAuth scaffolding — just bring an access token.
+`drivestore` wraps the Drive REST API in a dead-simple interface: **read, write, readBytes, writeBytes, append, exists, delete, list**. Text or binary, any state or database layer — no SDKs, no OAuth scaffolding, just bring an access token.
 
 ---
 
 ## Features
 
 - 📁 **Path-based API** — use familiar `folder/subfolder/file.txt` paths
+- 🧱 **Text or binary** — store strings or raw `Uint8Array` bytes; large payloads use resumable upload
 - 🗂️ **Auto folder creation** — nested folders are created on demand
 - ⚡ **Folder ID caching** — repeated writes to the same directory skip redundant API calls
 - 🛡️ **Typed errors** — `DriveError` carries `.status` and `.body` so you can branch on 404 vs 401
 - 🔑 **Flexible auth** — pass a static token string or an async function that refreshes it
-- 🪶 **Zero dependencies** — uses the native `fetch` API
+- 🔁 **Resilient by default** — automatic backoff retries on rate-limit/5xx, one-shot token refresh on `401`
+- 🪶 **Zero dependencies** — uses the native `fetch` API (bring your own for Node <18)
 
 ---
 
@@ -45,6 +47,30 @@ yarn add drivestore
 ```
 
 Requires **Node 18+** (or any runtime with `fetch` built in).
+
+### Browser via `<script>` (no build step)
+
+Use the ES module build straight from a CDN:
+
+```html
+<script type="module">
+  import { createDriveStore } from "https://cdn.jsdelivr.net/npm/drivestore/+esm";
+  const store = createDriveStore({ accessToken });
+</script>
+```
+
+…or the classic global build, which exposes a `DriveStore` global:
+
+```html
+<script src="https://unpkg.com/drivestore"></script>
+<script>
+  const store = DriveStore.createDriveStore({ accessToken });
+  // DriveStore.DriveError is available too
+</script>
+```
+
+`drivestore` runs anywhere there's a `fetch` — a static HTML page with no
+server or backend, a browser app, Node, Deno, or Bun.
 
 ---
 
@@ -110,10 +136,17 @@ await store.delete("users/alice/prefs.json");
 
 Returns a `DriveStore` instance.
 
-| Option        | Type                              | Default         | Description                                                                       |
-| ------------- | --------------------------------- | --------------- | --------------------------------------------------------------------------------- |
-| `accessToken` | `string \| () => Promise<string>` | —               | **Required.** OAuth token or async supplier.                                      |
-| `rootName`    | `string`                          | `"drive-store"` | Name of the root folder in `appDataFolder`. Useful for namespacing multiple apps. |
+| Option             | Type                              | Default         | Description                                                                        |
+| ------------------ | --------------------------------- | --------------- | --------------------------------------------------------------------------------- |
+| `accessToken`      | `string \| () => Promise<string>` | —               | **Required.** OAuth token or async supplier.                                      |
+| `rootName`         | `string`                          | `"drive-store"` | Name of the root folder in `appDataFolder`. Useful for namespacing multiple apps. |
+| `fetch`            | `typeof fetch`                    | global `fetch`  | Custom `fetch` (Node <18 polyfill, proxies, or test mocking).                     |
+| `signal`           | `AbortSignal`                     | —               | Abort signal applied to every request.                                            |
+| `timeoutMs`        | `number`                          | —               | Per-request timeout in milliseconds.                                              |
+| `maxRetries`       | `number`                          | `3`             | Retry attempts for transient failures (`429`/`502`/`503`/`504`). `0` disables.    |
+| `retryBaseDelayMs` | `number`                          | `300`           | Base delay for exponential backoff between retries.                               |
+| `apiBaseUrl`       | `string`                          | Google Drive v3 | Override the Drive metadata API base URL (advanced / testing).                    |
+| `uploadBaseUrl`    | `string`                          | Google upload   | Override the Drive upload API base URL (advanced / testing).                       |
 
 ---
 
@@ -135,6 +168,24 @@ Creates or fully overwrites a file. Intermediate folders are created automatical
 
 ```ts
 await store.write("config.json", JSON.stringify(config));
+```
+
+#### `readBytes(path): Promise<Uint8Array>`
+
+Reads a file as raw bytes. Throws `DriveError` with `status: 404` if the file
+does not exist.
+
+```ts
+const bytes = await store.readBytes("cache/image.png");
+```
+
+#### `writeBytes(path, data): Promise<void>`
+
+Creates or fully overwrites a file with raw bytes. Works for any binary payload;
+payloads above ~5 MB are uploaded via Drive's resumable protocol automatically.
+
+```ts
+await store.writeBytes("cache/image.png", new Uint8Array(buffer));
 ```
 
 #### `append(path, content): Promise<void>`
@@ -163,6 +214,22 @@ Deletes the file. Throws `DriveError` with `status: 404` if the file does not ex
 await store.delete("cache/result.json");
 ```
 
+#### `list(path): Promise<DriveEntry[]>`
+
+Lists the entries directly under a directory. Pass an empty path to list the
+store root. Each entry is `{ name, type }` where `type` is `"file"` or
+`"directory"`. Throws `DriveError` with `status: 404` if the directory does not
+exist.
+
+```ts
+const entries = await store.list("logs");
+// [{ name: "2025-01.txt", type: "file" }, { name: "archive", type: "directory" }]
+
+for (const entry of entries) {
+  if (entry.type === "file") console.log(entry.name);
+}
+```
+
 ---
 
 ### `DriveError`
@@ -188,6 +255,36 @@ try {
 | `message` | `string` | Human-readable description including the HTTP status |
 | `status`  | `number` | HTTP status code (`404`, `401`, `403`, …)            |
 | `body`    | `string` | Raw response body from the Drive API                 |
+
+---
+
+## Storing binary data & databases
+
+`drivestore` is storage-agnostic — it just persists bytes at a path. How you
+produce those bytes is entirely up to you. The text (`read`/`write`) and binary
+(`readBytes`/`writeBytes`) APIs are peers; pick whichever fits your data.
+
+A few equally-valid patterns:
+
+```ts
+// Direct state — persist whatever you already have
+await store.write("settings.json", JSON.stringify(settings));
+
+// A Redux / Zustand / Jotai snapshot — serialize your store however you like
+await store.write("state.json", JSON.stringify(serializeStore()));
+
+// Raw binary — images, msgpack, compressed blobs, protobufs, …
+await store.writeBytes("assets/logo.png", new Uint8Array(buffer));
+
+// A sql.js database — export to bytes and round-trip them as-is
+await store.writeBytes("db/app.sqlite", db.export());
+const SQL = await initSqlJs();
+const restored = new SQL.Database(await store.readBytes("db/app.sqlite"));
+```
+
+The binary API stores bytes verbatim (no base64 inflation), so it suits large
+or non-text payloads. sql.js is just one option among many — bring any state or
+database layer you prefer.
 
 ---
 
@@ -229,9 +326,15 @@ echo "GOOGLE_ACCESS_TOKEN=ya29.your-token" > .env.test
 # Run all tests
 npm test
 
-# Run only unit tests (no token needed)
-npm test -- --testPathPattern="functions|path"
+# Run only the network-free unit suites (no token needed)
+npm test -- request folder-cache list binary public-api
 ```
+
+The suites above (`request`, `folder-cache`, `list`, `binary`, `public-api`)
+use an injected `fetch`, so they need no network or token. The `drive-api` and
+`drive-path` files also contain pure-function unit tests, but those same files
+include integration tests that require `GOOGLE_ACCESS_TOKEN` — so running them
+needs a token.
 
 To get a token quickly during development:
 
@@ -245,19 +348,22 @@ gcloud auth print-access-token
 
 ```
 src/
-├── types.ts        # DriveFile, DriveError, DriveStore interface
-├── drive-api.ts    # Low-level Drive REST wrappers
-├── drive-path.ts   # Path utilities and folder resolution
+├── types.ts        # DriveFile, DriveEntry, DriveError, DriveStore interface
+├── request.ts      # Request context: fetch, auth, timeout/abort, retries
+├── drive-api.ts    # Low-level Drive REST wrappers (text + binary)
+├── drive-path.ts   # Path utilities and folder resolution/cache
 ├── drive-store.ts  # createDriveStore factory
-├── functions.ts    # Utility functions
 └── index.ts        # Public exports
 
 test/
 ├── auth-permission.test.ts
+├── binary.test.ts
 ├── drive-api.test.ts
 ├── drive-path.test.ts
 ├── drive-store.test.ts
-├── functions.test.ts
+├── folder-cache.test.ts
+├── list.test.ts
+├── request.test.ts
 ├── get-token.ts
 └── setup.ts
 ```
