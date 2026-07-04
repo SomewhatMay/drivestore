@@ -1,7 +1,7 @@
 {
   "name": "drivestore",
   "description": "A tiny, typed path-based file store backed by Google Drive's appDataFolder — store text or binary, bring any state or database layer.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
