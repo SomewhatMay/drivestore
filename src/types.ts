@@ -7,7 +7,11 @@ export type DriveFile = {
 export interface DriveStore {
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
-  /** Creates the file if it does not exist; appends otherwise. NOT atomic under concurrent access. */
+  /**
+   * Creates the file if it does not exist; appends otherwise. NOT atomic:
+   * concurrent appends across tabs/processes may interleave or lose data.
+   * Serialize access at the application level if that matters.
+   */
   append(path: string, newContent: string): Promise<void>;
   exists(path: string): Promise<boolean>;
   delete(path: string): Promise<void>;
@@ -29,6 +33,13 @@ export interface DriveStoreOptions {
   apiBaseUrl?: string;
   /** Override the Drive upload API base URL (advanced / testing). */
   uploadBaseUrl?: string;
+  /**
+   * Max retry attempts for transient failures (429/502/503/504), after the
+   * first try. Defaults to `3`. Set to `0` to disable retries.
+   */
+  maxRetries?: number;
+  /** Base delay (ms) for exponential backoff between retries. Defaults to `300`. */
+  retryBaseDelayMs?: number;
 }
 
 /** Thrown on any Drive API HTTP error. Carries the status code and raw body. */

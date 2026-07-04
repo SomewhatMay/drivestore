@@ -156,3 +156,104 @@ describe("driveFetch", () => {
     await expect(driveFetch(ctx, "https://example.test/x")).rejects.toThrow();
   });
 });
+
+describe("driveFetch — resilience", () => {
+  function status(code: number): Response {
+    return new Response("", { status: code });
+  }
+
+  it("retries a transient 503 then returns the eventual success", async () => {
+    const fetchImpl = vi
+      .fn<(url: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(status(503))
+      .mockResolvedValueOnce(okResponse());
+
+    const ctx = createContext({
+      accessToken: "t",
+      fetch: fetchImpl as never,
+      retryBaseDelayMs: 1,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after maxRetries and returns the last response", async () => {
+    const fetchImpl = vi.fn(async () => status(503));
+    const ctx = createContext({
+      accessToken: "t",
+      fetch: fetchImpl as never,
+      maxRetries: 2,
+      retryBaseDelayMs: 1,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(503);
+    // first attempt + 2 retries
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry non-transient statuses (e.g. 404)", async () => {
+    const fetchImpl = vi.fn(async () => status(404));
+    const ctx = createContext({
+      accessToken: "t",
+      fetch: fetchImpl as never,
+      retryBaseDelayMs: 1,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(404);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes the token once on a 401 and retries", async () => {
+    const supplier = vi.fn(async () => "token");
+    const fetchImpl = vi
+      .fn<(url: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(status(401))
+      .mockResolvedValueOnce(okResponse());
+
+    const ctx = createContext({
+      accessToken: supplier,
+      fetch: fetchImpl as never,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // token re-resolved for the retry
+    expect(supplier).toHaveBeenCalledTimes(2);
+  });
+
+  it("only retries a 401 once", async () => {
+    const fetchImpl = vi.fn(async () => status(401));
+    const ctx = createContext({
+      accessToken: "t",
+      fetch: fetchImpl as never,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(401);
+    // original + single refresh retry
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("honors a Retry-After header", async () => {
+    const fetchImpl = vi
+      .fn<(url: string, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(
+        new Response("", { status: 429, headers: { "Retry-After": "0" } })
+      )
+      .mockResolvedValueOnce(okResponse());
+
+    const ctx = createContext({
+      accessToken: "t",
+      fetch: fetchImpl as never,
+    });
+
+    const res = await driveFetch(ctx, "https://example.test/x");
+    expect(res.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});

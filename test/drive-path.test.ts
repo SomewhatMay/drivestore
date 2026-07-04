@@ -3,6 +3,7 @@ import {
   splitPath,
   resolveRootFolder,
   resolveFolderChain,
+  createFolderCache,
 } from "../src/drive-path";
 import {
   createFolder,
@@ -90,7 +91,7 @@ describe("resolveFolderChain — integration", () => {
   it("returns rootId immediately for an empty segment list", async () => {
     const ctx = ctxFromToken();
     const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
-    const cache = new Map<string, string>();
+    const cache = createFolderCache();
 
     try {
       const result = await resolveFolderChain(ctx, rootId, [], false, cache);
@@ -103,7 +104,7 @@ describe("resolveFolderChain — integration", () => {
   it("creates nested folders when createMissing is true", async () => {
     const ctx = ctxFromToken();
     const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
-    const cache = new Map<string, string>();
+    const cache = createFolderCache();
     const seg1 = uniqueName();
     const seg2 = uniqueName();
 
@@ -131,7 +132,7 @@ describe("resolveFolderChain — integration", () => {
   it("throws DriveError (404) when folder is missing and createMissing is false", async () => {
     const ctx = ctxFromToken();
     const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
-    const cache = new Map<string, string>();
+    const cache = createFolderCache();
 
     try {
       await expect(
@@ -145,12 +146,12 @@ describe("resolveFolderChain — integration", () => {
   it("populates the folder cache and avoids re-traversal", async () => {
     const ctx = ctxFromToken();
     const rootId = await createFolder(ctx, "appDataFolder", uniqueName());
-    const cache = new Map<string, string>();
+    const cache = createFolderCache();
     const seg = uniqueName();
 
     try {
       const id1 = await resolveFolderChain(ctx, rootId, [seg], true, cache);
-      expect(cache.size).toBe(1);
+      expect(cache.resolved.size).toBe(1);
 
       // Second call — should use cache (still returns same ID)
       const id2 = await resolveFolderChain(ctx, rootId, [seg], false, cache);
