@@ -15,6 +15,14 @@ export interface DriveEntry {
 export interface DriveStore {
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
+  /** Reads a file as raw bytes. Throws `DriveError` 404 if it does not exist. */
+  readBytes(path: string): Promise<Uint8Array>;
+  /**
+   * Writes raw bytes, creating or fully overwriting the file. Suitable for any
+   * binary payload — images, msgpack, compressed state, a serialized database,
+   * etc. Large payloads are uploaded via Drive's resumable protocol.
+   */
+  writeBytes(path: string, data: Uint8Array): Promise<void>;
   /**
    * Creates the file if it does not exist; appends otherwise. NOT atomic:
    * concurrent appends across tabs/processes may interleave or lose data.

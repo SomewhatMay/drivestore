@@ -1,10 +1,13 @@
 import {
+  createBinaryFile,
   createTextFile,
   deleteById,
-  findChild,
+  findChildFile,
   FOLDER_MIME,
   listChildren,
+  readBytesById,
   readTextById,
+  updateBytesById,
   updateTextById,
 } from "./drive-api";
 import {
@@ -68,7 +71,9 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
       folderCache
     );
     const fileName = parts[parts.length - 1];
-    const file = await findChild(ctx, folderId, fileName, "text/plain");
+    // Match the leaf by name regardless of MIME so text and binary files are
+    // both resolvable (the leaf is any non-folder child with this name).
+    const file = await findChildFile(ctx, folderId, fileName);
     return { folderId, fileName, file };
   }
 
@@ -90,6 +95,26 @@ export function createDriveStore(options: DriveStoreOptions): DriveStore {
         await updateTextById(ctx, file.id, content);
       } else {
         await createTextFile(ctx, folderId, fileName, content);
+      }
+    },
+
+    async readBytes(path: string): Promise<Uint8Array> {
+      if (!path) throw new Error("Path is empty");
+      const parts = splitPath(path);
+      const { file } = await resolveFilePath(parts, false);
+      if (!file) throw new DriveError(`File not found: "${path}"`, 404);
+      return readBytesById(ctx, file.id);
+    },
+
+    async writeBytes(path: string, data: Uint8Array): Promise<void> {
+      if (!path) throw new Error("Path is empty");
+      const parts = splitPath(path);
+      const { folderId, fileName, file } = await resolveFilePath(parts, true);
+
+      if (file) {
+        await updateBytesById(ctx, file.id, data);
+      } else {
+        await createBinaryFile(ctx, folderId, fileName, data);
       }
     },
 
