@@ -82,7 +82,14 @@ You'll need an OAuth 2.0 access token with the `https://www.googleapis.com/auth/
 
 - **Browser apps** — use [Google Identity Services](https://developers.google.com/identity/oauth2/web/guides/use-token-model)
 - **Server apps** — use a service account or the [googleapis](https://github.com/googleapis/google-api-nodejs-client) Node.js client
-- **CLIs / local tools** — use `gcloud auth print-access-token` during development
+
+**Just trying the library or running the tests?** The
+**[Getting a token](./GETTING_A_TOKEN.md)** guide walks through it step by step,
+using the Google OAuth Playground. No code required, takes a few minutes.
+
+> ℹ️ **Note:** `gcloud auth print-access-token` won't work here. It issues a
+> token scoped to `cloud-platform`, which doesn't include `drive.appdata`, so
+> Drive rejects it. Use the guide above instead.
 
 ### 2. Create a store
 
@@ -333,14 +340,15 @@ npm test -- request folder-cache list binary public-api
 The suites above (`request`, `folder-cache`, `list`, `binary`, `public-api`)
 use an injected `fetch`, so they need no network or token. The `drive-api` and
 `drive-path` files also contain pure-function unit tests, but those same files
-include integration tests that require `GOOGLE_ACCESS_TOKEN` — so running them
-needs a token.
+include integration tests that require `GOOGLE_ACCESS_TOKEN`. The `drive-store`
+and `auth-permission` suites are integration-only. Running any of those, or the
+full `npm test`, needs a token.
 
-To get a token quickly during development:
-
-```bash
-gcloud auth print-access-token
-```
+To get one, follow the **[Getting a token](./GETTING_A_TOKEN.md)** guide. It uses
+the Google OAuth Playground to produce a `drive.appdata` token in a few minutes.
+The token lasts about an hour, so regenerate it when the integration tests start
+failing with `401`. (`gcloud auth print-access-token` won't work: its
+`cloud-platform` scope doesn't include `drive.appdata`.)
 
 ---
 
